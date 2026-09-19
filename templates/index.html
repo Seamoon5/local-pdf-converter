@@ -144,9 +144,31 @@
         .toast.show { opacity: 1; }
 
         .empty { color: var(--muted); text-align: center; font-size: 0.85rem; margin-top: 1.2rem; }
+
+        .wrong-mode {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #92400e; color: #ffedd5;
+            padding: 1rem 1.5rem; text-align: center;
+            font-size: 0.95rem; z-index: 200;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            display: none;
+        }
+        .wrong-mode button {
+            margin-left: 0.8rem;
+            background: #f59e0b; color: #1c1917; border: none;
+            padding: 0.4rem 1rem; border-radius: 0.4rem;
+            font-weight: 700; cursor: pointer; font-size: 0.85rem;
+        }
+        .wrong-mode button:hover { background: #fbbf24; }
     </style>
 </head>
 <body>
+
+    <div class="wrong-mode" id="wrong-mode">
+        ⚠️ You opened this page as a file — the app can't work this way.
+        Open it through the converter server instead:
+        <button type="button" id="btn-open-proper">Open App Properly</button>
+    </div>
 
     <header>
         <h1>Local PDF <span>&</span> Word Converter</h1>
@@ -188,6 +210,25 @@
         const emptyNote = document.getElementById('empty-note');
         const actionsBar = document.getElementById('actions-bar');
         const toastEl = document.getElementById('toast');
+
+        // If opened as a plain file (file://), the server is missing,
+        // so offer to jump to the correct address.
+        const openProper = document.getElementById('btn-open-proper');
+        if (window.location.protocol === 'file:') {
+            document.getElementById('wrong-mode').style.display = 'block';
+            openProper.addEventListener('click', async () => {
+                try {
+                    const res = await fetch('http://127.0.0.1:8000/api/health');
+                    if (res.ok) {
+                        window.location.href = 'http://127.0.0.1:8000/';
+                    } else {
+                        showToast('Server is running but not ready — try again.');
+                    }
+                } catch (e) {
+                    showToast('Server is not running yet. Double-click run.bat first.');
+                }
+            });
+        }
 
         let files = [];
 
@@ -325,7 +366,7 @@
             } catch (err) {
                 let message = err.message;
                 if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-                    message = 'Server unreachable. Check the black "converter" window is still open and not crashed.';
+                    message = 'Cannot reach the server. Open this app at http://127.0.0.1:8000 (via run.bat), not as a file.';
                 }
                 setItemStatus(id, { status: 'error', error: message });
             }
