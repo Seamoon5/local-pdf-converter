@@ -8,8 +8,8 @@ echo   Setting up PDF and Word Converter...
 echo ============================================
 echo.
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+py -3 -m pip install --upgrade pip
+py -3 -m pip install -r requirements.txt
 
 echo.
 echo ============================================
@@ -18,5 +18,5 @@ echo   Keep this window open while using it.
 echo ============================================
 echo.
 
-python app.py
+py -3 app.py
 pause
