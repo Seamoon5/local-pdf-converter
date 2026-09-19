@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local PDF & Word Converter</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --border: #334155;
+            --accent: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+        body {
+            background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 60%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        header { text-align: center; margin-bottom: 2rem; }
+
+        header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+        header h1 span { color: var(--primary); }
+        header p { color: var(--muted); font-size: 0.95rem; }
+
+        .privacy-note {
+            margin-top: 0.6rem;
+            display: inline-block;
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+        }
+
+        .drop-zone {
+            width: 100%;
+            max-width: 700px;
+            background: var(--surface);
+            border: 2px dashed var(--border);
+            border-radius: 1rem;
+            padding: 3rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .drop-zone.dragover { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+        .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.6rem; }
+        .drop-zone h2 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+        .drop-zone p { color: var(--muted); font-size: 0.85rem; }
+        .drop-zone .browse {
+            margin-top: 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.4rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .drop-zone .browse:hover { background: var(--primary-hover); }
+
+        #file-input { display: none; }
+
+        .settings {
+            width: 100%;
+            max-width: 700px;
+            margin: 1.2rem 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+        }
+        .settings label { color: var(--muted); font-size: 0.85rem; }
+        .radio-group { display: flex; gap: 1rem; font-size: 0.9rem; }
+        .radio-group label { color: var(--text); display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+        .radio-group input { accent-color: var(--primary); }
+
+        .queue { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.8rem; }
+
+        .file-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 0.9rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        .file-item .thumb {
+            width: 42px; height: 42px; border-radius: 0.4rem;
+            background: rgba(99, 102, 241, 0.15); color: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.8rem; flex-shrink: 0;
+        }
+        .file-item .meta { flex: 1; min-width: 0; }
+        .file-item .meta .name { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item .meta .sub { font-size: 0.75rem; color: var(--muted); }
+        .file-item .status { font-size: 0.8rem; color: var(--muted); min-width: 90px; text-align: right; }
+        .file-item .status.done { color: var(--accent); }
+        .file-item .status.error { color: var(--danger); }
+        .file-item .status.converting { color: var(--primary); }
+
+        .btn {
+            background: var(--primary); color: white; border: none;
+            padding: 0.45rem 1rem; border-radius: 0.45rem;
+            font-weight: 600; font-size: 0.8rem; cursor: pointer;
+            transition: background 0.2s; flex-shrink: 0;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.danger { background: var(--danger); }
+        .btn.danger:hover { background: #dc2626; }
+        .btn-download { background: var(--accent); }
+        .btn-download:hover { background: #16a34a; }
+
+        .actions { width: 100%; max-width: 700px; display: flex; gap: 0.7rem; margin-top: 1.2rem; }
+
+        .toast {
+            position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+            background: var(--surface); border: 1px solid var(--border);
+            color: var(--text); padding: 0.7rem 1.3rem; border-radius: 0.5rem;
+            font-size: 0.85rem; box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            opacity: 0; pointer-events: none; transition: opacity 0.25s;
+        }
+        .toast.show { opacity: 1; }
+
+        .empty { color: var(--muted); text-align: center; font-size: 0.85rem; margin-top: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Local PDF <span>&</span> Word Converter</h1>
+        <p>Convert between PDF and Word documents on your own computer.</p>
+        <div class="privacy-note">🔒 100% private and offline — files never leave this device</div>
+    </header>
+
+    <div class="drop-zone" id="drop-zone">
+        <div class="icon">📄</div>
+        <h2>Drop your file here</h2>
+        <p>Supports .pdf, .docx and .doc (up to 60 MB)</p>
+        <button class="browse" id="btn-browse" type="button">Browse Files</button>
+    </div>
+    <input type="file" id="file-input" multiple accept=".pdf,.docx,.doc">
+
+    <div class="settings">
+        <label>Convert to:</label>
+        <div class="radio-group">
+            <label><input type="radio" name="target" value="docx" id="target-docx"> Word (.docx)</label>
+            <label><input type="radio" name="target" value="pdf" id="target-pdf" checked> PDF</label>
+            <label><input type="radio" name="target" value="auto" id="target-auto" checked> Auto (recommended)</label>
+        </div>
+    </div>
+
+    <div class="actions" style="display:none" id="actions-bar">
+        <button class="btn" id="btn-convert-all">Convert All</button>
+        <button class="btn danger" id="btn-clear-all">Clear All</button>
+    </div>
+
+    <div class="queue" id="queue"></div>
+    <div class="empty" id="empty-note">No files yet. Drop PDF or Word files above to begin.</div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const queueEl = document.getElementById('queue');
+        const emptyNote = document.getElementById('empty-note');
+        const actionsBar = document.getElementById('actions-bar');
+        const toastEl = document.getElementById('toast');
+
+        let files = [];
+
+        document.getElementById('btn-browse').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => addFiles(Array.from(e.target.files)));
+
+        ['dragover', 'dragenter'].forEach(evt =>
+            dropZone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            })
+        );
+        ['dragleave', 'drop'].forEach(evt =>
+            dropZone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            })
+        );
+        dropZone.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
+        });
+
+        function addFiles(newFiles) {
+            newFiles.forEach(f => {
+                const ext = f.name.split('.').pop().toLowerCase();
+                if (!['pdf', 'docx', 'doc'].includes(ext)) {
+                    showToast(f.name + ' is not supported.');
+                    return;
+                }
+                files.push({
+                    id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+                    file: f,
+                    status: 'ready',
+                    downloadUrl: null,
+                    resultName: null,
+                    error: null
+                });
+            });
+            render();
+        }
+
+        function computeTarget(item) {
+            const choice = document.querySelector('input[name="target"]:checked').value;
+            const ext = item.file.name.split('.').pop().toLowerCase();
+            if (choice === 'docx') return 'docx';
+            if (choice === 'pdf') return 'pdf';
+            return ext === 'pdf' ? 'docx' : 'pdf';
+        }
+
+        function render() {
+            actionsBar.style.display = files.length ? 'flex' : 'none';
+            emptyNote.style.display = files.length ? 'none' : 'block';
+            queueEl.innerHTML = '';
+
+            files.forEach(item => {
+                const target = computeTarget(item);
+                const sizeText = (item.file.size / 1024).toFixed(0) + ' KB';
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.id = 'item-' + item.id;
+
+                let statusHtml = '';
+                let actionHtml = '';
+
+                if (item.status === 'ready') {
+                    statusHtml = '<span class="status">Ready</span>';
+                    actionHtml = `<button class="btn" onclick="convertOne('${item.id}')">Convert to ${target === 'docx' ? 'Word' : 'PDF'}</button>`;
+                } else if (item.status === 'converting') {
+                    statusHtml = '<span class="status converting">Converting…</span>';
+                    actionHtml = '';
+                } else if (item.status === 'done') {
+                    statusHtml = '<span class="status done">Done</span>';
+                    actionHtml = `<a href="${item.downloadUrl}" download="${item.resultName}"><button class="btn btn-download">Download</button></a>`;
+                } else {
+                    statusHtml = `<span class="status error">${item.error}</span>`;
+                    actionHtml = `<button class="btn" onclick="convertOne('${item.id}')">Retry</button>`;
+                }
+
+                div.innerHTML = `
+                    <div class="thumb">${item.file.name.split('.').pop().toUpperCase()}</div>
+                    <div class="meta">
+                        <div class="name">${escapeHtml(item.file.name)}</div>
+                        <div class="sub">${sizeText} → ${target.toUpperCase()}</div>
+                    </div>
+                    ${statusHtml}
+                    ${actionHtml}
+                    <button class="btn danger" onclick="removeItem('${item.id}')" title="Remove">✕</button>
+                `;
+                queueEl.appendChild(div);
+            });
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function removeItem(id) {
+            const idx = files.findIndex(f => f.id === id);
+            if (idx !== -1) files.splice(idx, 1);
+            render();
+        }
+
+        function setItemStatus(id, patch) {
+            const item = files.find(f => f.id === id);
+            Object.assign(item, patch);
+            render();
+        }
+
+        async function convertOne(id) {
+            const item = files.find(f => f.id === id);
+            if (!item || item.status === 'converting') return;
+
+            setItemStatus(id, { status: 'converting', error: null });
+
+            const formData = new FormData();
+            formData.append('file', item.file);
+
+            try {
+                const res = await fetch('/api/convert', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Conversion failed.');
+                }
+
+                const blob = await res.blob();
+                const disposition = res.headers.get('Content-Disposition') || '';
+                const match = disposition.match(/filename="?([^";]+)"?/);
+                const resultName = match ? match[1] : ('converted_' + Date.now() + '.' + (computeTarget(item)));
+
+                const url = URL.createObjectURL(blob);
+                setItemStatus(id, { status: 'done', downloadUrl: url, resultName: resultName });
+                showToast('Converted: ' + resultName);
+            } catch (err) {
+                setItemStatus(id, { status: 'error', error: err.message });
+            }
+        }
+
+        async function convertAll() {
+            const ready = files.filter(f => f.status === 'ready' || f.status === 'error');
+            for (const item of ready) {
+                await convertOne(item.id);
+            }
+        }
+
+        document.getElementById('btn-convert-all').addEventListener('click', convertAll);
+        document.getElementById('btn-clear-all').addEventListener('click', () => {
+            files.forEach(f => { if (f.downloadUrl) URL.revokeObjectURL(f.downloadUrl); });
+            files = [];
+            render();
+        });
+
+        document.querySelectorAll('input[name="target"]').forEach(r =>
+            r.addEventListener('change', render)
+        );
+
+        function showToast(text) {
+            toastEl.textContent = text;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
