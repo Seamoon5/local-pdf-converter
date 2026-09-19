@@ -323,7 +323,11 @@
                 setItemStatus(id, { status: 'done', downloadUrl: url, resultName: resultName });
                 showToast('Converted: ' + resultName);
             } catch (err) {
-                setItemStatus(id, { status: 'error', error: err.message });
+                let message = err.message;
+                if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+                    message = 'Server unreachable. Check the black "converter" window is still open and not crashed.';
+                }
+                setItemStatus(id, { status: 'error', error: message });
             }
         }
 

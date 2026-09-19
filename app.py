@@ -1,9 +1,12 @@
+import io
 import os
 import shutil
 import subprocess
 import tempfile
 import threading
+import traceback
 import webbrowser
+import mimetypes
 from flask import Flask, request, render_template, send_file, jsonify
 from werkzeug.utils import secure_filename
 
@@ -65,6 +68,16 @@ def index():
     return render_template('index.html')
 
 
+@app.errorhandler(413)
+def file_too_large(error):
+    return jsonify({'error': f'File is larger than {MAX_SIZE_MB} MB.'}), 413
+
+
+@app.route('/api/health')
+def api_health():
+    return jsonify({'status': 'ok'}), 200
+
+
 @app.route('/api/convert', methods=['POST'])
 def api_convert():
     if 'file' not in request.files:
@@ -91,16 +104,25 @@ def api_convert():
         target_ext = OUTPUT_EXTENSIONS[ext]
         dst_path = perform_conversion(src_path, target_ext)
 
+        # Read the converted file into memory BEFORE deleting anything.
+        # Deleting an open file fails on Windows and kills the request
+        # with "Failed to fetch".
+        with open(dst_path, 'rb') as fh:
+            data = fh.read()
+
         download_name = os.path.splitext(original_name)[0] + '.' + target_ext
+        mime = mimetypes.guess_type(download_name)[0] or 'application/octet-stream'
         return send_file(
-            dst_path,
+            io.BytesIO(data),
             as_attachment=True,
-            download_name=download_name
+            download_name=download_name,
+            mimetype=mime
         )
     except IndexError:
         return jsonify({'error': 'The PDF contains no extractable text or pages.'}), 500
     except Exception as exc:
-        return jsonify({'error': str(exc)}), 500
+        print('CONVERSION ERROR:', traceback.format_exc())
+        return jsonify({'error': str(exc) or 'Unknown error.'}), 500
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
