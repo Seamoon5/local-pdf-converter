@@ -1,10 +1,10 @@
 @echo off
-title PDF & Word Converter
+title PDF and Word Converter
 cd /d "%~dp0"
 
 echo.
 echo ============================================
-echo   Setting up PDF & Word Converter...
+echo   Setting up PDF and Word Converter...
 echo ============================================
 echo.
 
